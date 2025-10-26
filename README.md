@@ -1,239 +1,262 @@
-# Neoma Package Template
+# @neoma/managed-database
 
-Template for creating new Neoma packages with consistent structure, configuration, and testing setup.
+A managed database fixture for NestJS integration testing with TypeORM. Automatically handles in-memory SQLite database lifecycle for Jest tests.
 
-## Creating a New Package
+[![npm version](https://badge.fury.io/js/@neoma%2Fmanaged-database.svg)](https://www.npmjs.com/package/@neoma/managed-database)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-### 1. Copy this template
+## Motivation
 
-```bash
-cd /path/to/wulfstack/packages
-cp -r neoma-package-template neoma-<your-package-name>
-cd neoma-<your-package-name>
-```
+Integration testing NestJS applications with TypeORM requires setting up and tearing down database connections for each test. This package eliminates the boilerplate by:
 
-### 2. Replace placeholders
+- Automatically managing a single DataSource instance across tests
+- Using in-memory SQLite for fast, isolated test execution
+- Handling initialization and cleanup via Jest lifecycle hooks
+- Auto-discovering entities from your project structure
 
-Search and replace throughout the project:
-- `{{PACKAGE_NAME}}` → Your package name (e.g., "garmr", "validation")
-- `{{PACKAGE_DESCRIPTION}}` → Short description
-- `{{REPO_URL}}` → GitHub repository URL (e.g., "https://github.com/shipdventures/neoma-garmr")
+## Problem / Solution
 
-**Quick find/replace:**
-```bash
-# macOS/Linux
-find . -type f -name "*.json" -o -name "*.md" -o -name "*.ts" | xargs sed -i '' 's/{{PACKAGE_NAME}}/your-package-name/g'
-find . -type f -name "*.json" -o -name "*.md" -o -name "*.ts" | xargs sed -i '' 's/{{PACKAGE_DESCRIPTION}}/Your description/g'
-find . -type f -name "*.json" -o -name "*.md" -o -name "*.ts" | xargs sed -i '' 's|{{REPO_URL}}|https://github.com/your-org/your-repo|g'
-```
+### Without @neoma/managed-database
 
-### 3. Rename directories
-
-```bash
-mv libs/PACKAGE_NAME libs/your-package-name
-```
-
-### 4. Install dependencies
-
-```bash
-npm install
-```
-
-### 5. Start building!
-
-```bash
-npm test        # Unit tests (TDD)
-npm run test:e2e # E2E tests
-npm run build   # Build library
-npm run lint    # Lint code
-```
-
-## Package Structure
-
-```
-neoma-<package-name>/
-├── libs/
-│   └── <package-name>/           # The npm package
-│       ├── src/
-│       │   ├── modules/          # NestJS modules
-│       │   ├── decorators/       # Custom decorators
-│       │   ├── middlewares/      # Middleware
-│       │   ├── guards/           # Guards
-│       │   ├── services/         # Services
-│       │   ├── interfaces/       # TypeScript interfaces
-│       │   ├── constants/        # Constants
-│       │   └── index.ts          # Public API exports
-│       ├── package.json          # Published package.json
-│       └── tsconfig.lib.json     # Library TypeScript config
-├── src/                          # Example/test application
-│   ├── app.module.ts
-│   └── ...
-├── specs/                        # E2E tests
-│   ├── jest-e2e.json
-│   └── *.e2e-spec.ts
-├── fixtures/                     # Test fixtures and utilities
-│   ├── app/                      # Test app lifecycle management
-│   ├── database/                 # In-memory database setup
-│   ├── models/                   # Model factory patterns
-│   ├── matchers/                 # Custom Jest matchers
-│   └── e2e-setup.js              # E2E build hook
-├── package.json                  # Development package.json
-├── tsconfig.json                 # Root TypeScript config
-├── eslint.config.mjs             # ESLint config
-├── .prettierrc                   # Prettier config
-├── .gitignore
-├── .nvmrc
-├── LICENSE
-└── README.md                     # Package documentation
-```
-
-## Testing Strategy
-
-### E2E Tests (`specs/`)
-- One file per major feature or configuration
-- Tests full install experience and integration
-- Uses real NestJS app, real database
-- Proves README instructions work
-
-**Example**: The template includes `specs/app.e2e-spec.ts` demonstrating how to test endpoints using `managedAppInstance()` and supertest.
-
-### Unit Tests (`libs/<package>/src/**/*.spec.ts`)
-- TDD: Drive implementation
-- Test individual classes/functions
-- Fast feedback loop
-- Test edge cases and error handling
-
-**Example**: The template includes `libs/PACKAGE_NAME/src/modules/example.module.spec.ts` showing how to test NestJS modules.
-
-### Complete Testing Flow
-
-1. **Write library code** in `libs/PACKAGE_NAME/src/`
-2. **Write unit tests** alongside your code (`*.spec.ts`)
-3. **Export from** `libs/PACKAGE_NAME/src/index.ts`
-4. **Import in** `src/app.module.ts` for E2E testing
-5. **Write E2E tests** in `specs/` to validate integration
-
-The template includes working examples of all these steps with `ExampleModule`.
-
-**Don't test the same config twice** - E2E covers integration, unit tests cover logic.
-
-## Testing Infrastructure
-
-The template includes ready-to-use testing utilities in the `fixtures/` directory:
-
-### App Lifecycle (`fixtures/app`)
 ```typescript
-import { managedAppInstance } from "fixtures/app"
+import { DataSource } from "typeorm"
+import { User } from "./user.entity"
+import { Post } from "./post.entity"
 
-describe("My E2E Test", () => {
-  it("should work", async () => {
-    const app = managedAppInstance()
-    // App is automatically initialized before each test
-    // and cleaned up after each test
+describe("UserRepository", () => {
+  let dataSource: DataSource
+
+  beforeEach(async () => {
+    // Manually create and initialize datasource for each test
+    dataSource = new DataSource({
+      type: "sqlite",
+      database: ":memory:",
+      entities: [User, Post], // Must manually list all entities
+      synchronize: true,
+    })
+    await dataSource.initialize()
+  })
+
+  afterEach(async () => {
+    // Manually destroy datasource after each test
+    await dataSource.destroy()
+  })
+
+  it("should create a user", async () => {
+    const repo = dataSource.getRepository(User)
+    // Test code...
   })
 })
 ```
 
-### Database Setup (`fixtures/database`)
-```typescript
-import { managedDatasourceInstance } from "fixtures/database"
+### With @neoma/managed-database
 
-describe("My Database Test", () => {
-  it("should query database", async () => {
-    const datasource = managedDatasourceInstance()
-    // Fresh in-memory SQLite database for each test
-    // Automatically destroyed after each test
+```typescript
+import { managedDatasourceInstance } from "@neoma/managed-database"
+import { User } from "./user.entity"
+
+describe("UserRepository", () => {
+  it("should create a user", async () => {
+    // Get the managed instance - lifecycle handled automatically!
+    const dataSource = managedDatasourceInstance()
+    const repo = dataSource.getRepository(User)
+
+    const user = await repo.save({ username: "alice" })
+    expect(user.id).toBeDefined()
+  })
+
+  it("gets a fresh database for each test", async () => {
+    // Each test starts with a clean database
+    const dataSource = managedDatasourceInstance()
+    const repo = dataSource.getRepository(User)
+
+    const users = await repo.find()
+    expect(users).toHaveLength(0) // Always starts empty
   })
 })
 ```
 
-### Model Factories (`fixtures/models`)
-See `fixtures/models/README.md` for the pattern and examples.
+## Installation
 
-### Custom Matchers (`fixtures/matchers`)
-- `toThrowEquals(error)` - Assert errors match exactly
-- `toEqualError(error)` - Assert errors are equal
-
-### E2E Build Hook (`fixtures/e2e-setup.js`)
-Automatically builds the library before E2E tests run.
-
-## Scripts
-
-- `npm run build` - Build the library
-- `npm run lint` - Lint all code
-- `npm test` - Run unit tests in watch mode
-- `npm run test:e2e` - Run E2E tests in watch mode
-
-## Configuration Highlights
-
-### TypeScript
-- Target: ES2022
-- Strict null checks enabled
-- Decorators enabled
-- No semicolons (enforced)
-
-### ESLint
-- Explicit return types required
-- Explicit member accessibility required
-- No floating promises
-- Prettier integration
-
-### Jest
-- ts-jest for TypeScript
-- jest-extended for additional matchers
-- In-memory SQLite for tests
-- Module path mapping for clean imports
-
-## Example README Structure
-
-When you publish, your README should include:
-
-1. **Motivation** - Why this package exists
-2. **Problem/Solution** - Before/after code examples
-3. **Installation** - Step-by-step setup
-4. **Basic Usage** - Simple examples
-5. **Advanced Usage** - Custom configurations
-6. **API Reference** - All public APIs
-7. **Links** - npm, GitHub, docs
-
-See `@neoma/route-model-binding` README for a good example.
-
-## Publishing Checklist
-
-Before publishing to npm:
-
-- [ ] All tests passing
-- [ ] README is complete
-- [ ] LICENSE file included
-- [ ] Version bumped in both package.json files
-- [ ] Built with `npm run build`
-- [ ] Verify exports in `libs/<package>/src/index.ts`
-- [ ] Test installation in separate project
-- [ ] Verify peer dependencies are correct
+### 1. Install the package
 
 ```bash
-cd libs/<your-package-name>
-npm publish --access public
+npm install --save-dev @neoma/managed-database
 ```
 
-## Neoma Package Standards
+### 2. Install peer dependencies
 
-All Neoma packages should:
-- ✅ Be Laravel-inspired but NestJS-native
-- ✅ Have minimal boilerplate
-- ✅ Include comprehensive tests
-- ✅ Have excellent documentation
-- ✅ Use TypeScript strictly
-- ✅ Follow consistent code style
-- ✅ Be production-ready
+```bash
+npm install --save-dev sqlite3 typeorm @nestjs/typeorm
+npm install @nestjs/common @nestjs/core
+```
 
-## Template Improvements (TODO)
+### 3. Import in your test files
 
-Future enhancements to this template:
+```typescript
+import { managedDatasourceInstance } from "@neoma/managed-database"
+```
 
-- [ ] **GitHub Issue & PR Templates** - Add `.github/ISSUE_TEMPLATE/` for bug reports and feature requests, plus `.github/pull_request_template.md`
-- [ ] **CONTRIBUTING.md** - Document contribution guidelines, coding standards, and development workflow
-- [ ] **CHANGELOG.md Template** - Add template following Keep a Changelog format
-- [ ] **README Badges** - Add placeholders for CI status, npm version, and license badges
-- [ ] **VSCode Extensions** - Add `.vscode/extensions.json` with recommended extensions for NestJS development
-- [ ] **CODE_OF_CONDUCT.md** - Add community standards if accepting external contributions
+That's it! The package automatically registers Jest hooks when imported, so your database lifecycle is managed automatically.
+
+## Basic Usage
+
+### Repository Testing
+
+```typescript
+import { managedDatasourceInstance } from "@neoma/managed-database"
+import { User } from "./user.entity"
+
+describe("User Repository", () => {
+  it("should create and retrieve users", async () => {
+    const dataSource = managedDatasourceInstance()
+    const userRepo = dataSource.getRepository(User)
+
+    const user = await userRepo.save({
+      username: "alice",
+    })
+
+    const found = await userRepo.findOne({ where: { id: user.id } })
+    expect(found.username).toBe("alice")
+  })
+})
+```
+
+### Testing Services
+
+```typescript
+import { managedDatasourceInstance } from "@neoma/managed-database"
+import { UserService } from "./user.service"
+import { User } from "./user.entity"
+
+describe("UserService", () => {
+  let service: UserService
+
+  beforeEach(() => {
+    const dataSource = managedDatasourceInstance()
+    service = new UserService(dataSource.getRepository(User))
+  })
+
+  it("should create users", async () => {
+    const user = await service.create({ username: "alice" })
+    expect(user.id).toBeDefined()
+  })
+})
+```
+
+## API Reference
+
+### `managedDatasourceInstance(): DataSource`
+
+Returns the managed DataSource instance for the current test.
+
+**Returns:** `DataSource` - A TypeORM DataSource instance configured with in-memory SQLite
+
+**Lifecycle:**
+- Automatically initialized before each test via `beforeEach` hook
+- Automatically destroyed after each test via `afterEach` hook
+- Returns the same instance within a single test
+- Returns a fresh instance for each new test
+
+**Example:**
+```typescript
+const dataSource = managedDatasourceInstance()
+const repo = dataSource.getRepository(User)
+```
+
+**Note:** The lifecycle hooks are registered automatically when you import anything from this package, so you don't need to call any setup functions.
+
+### `datasource(): Promise<DataSource>`
+
+Low-level function to create a new DataSource instance. Used internally by `managedDatasourceInstance()`.
+
+**Returns:** `Promise<DataSource>` - A new, initialized DataSource instance
+
+**Configuration:**
+- Type: SQLite
+- Database: In-memory (`:memory:`)
+- Entities: Auto-discovered from `src/**/*.entity.ts`
+- Synchronize: Enabled (auto-creates schema)
+
+## Configuration
+
+### Entity Discovery
+
+The package automatically discovers entities from:
+
+```
+src/**/*.entity.ts
+```
+
+This pattern will find all entity files in your `src` directory and subdirectories. Ensure your entities:
+
+1. Use the `.entity.ts` naming convention
+2. Are located under the `src/` directory
+3. Export classes decorated with `@Entity()`
+
+**Example Structure:**
+```
+src/
+├── user.entity.ts
+├── post.entity.ts
+└── modules/
+    └── auth/
+        └── session.entity.ts
+```
+
+All three entities (User, Post, Session) will be automatically discovered.
+
+### Database Configuration
+
+The package uses the following TypeORM configuration:
+
+```typescript
+{
+  type: "sqlite",
+  database: ":memory:",
+  entities: ["src/**/*.entity.ts"],
+  synchronize: true,
+}
+```
+
+**Key Features:**
+- **SQLite In-Memory:** Each test gets a completely isolated database
+- **Auto-Sync:** Schema is automatically created from your entities
+- **Fast:** In-memory databases are extremely fast for testing
+- **Clean State:** Every test starts with a fresh, empty database
+
+## Why SQLite In-Memory?
+
+Testing with SQLite in-memory provides several advantages:
+
+1. **Speed:** Orders of magnitude faster than traditional databases
+2. **Isolation:** Each test gets a completely independent database
+3. **Portability:** No external database setup required
+4. **CI/CD Friendly:** Works out of the box in any environment
+5. **Consistency:** Deterministic test behavior
+
+## Requirements
+
+- Node.js >= 22.0.0
+- Jest testing framework
+- TypeScript >= 5.0
+- NestJS >= 11.0
+- TypeORM >= 0.3
+
+## Links
+
+- [npm package](https://www.npmjs.com/package/@neoma/managed-database)
+- [GitHub repository](https://github.com/shipdventures/neoma-managed-database)
+- [Report Issues](https://github.com/shipdventures/neoma-managed-database/issues)
+
+## Related Packages
+
+- [@neoma/managed-app](https://www.npmjs.com/package/@neoma/managed-app) - Managed NestJS app instances for E2E testing
+
+## License
+
+MIT
+
+---
+
+Built with love by [Shipdventures](https://github.com/shipdventures) for the NestJS community.

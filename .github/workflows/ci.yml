@@ -38,9 +38,6 @@ jobs:
       - name: Run tests
         run: npm test -- --watchAll=false --passWithNoTests
 
-      - name: Run E2E tests
-        run: npm run test:e2e -- --watchAll=false --passWithNoTests
-
   publish:
     needs: test
     runs-on: ubuntu-latest
@@ -64,7 +61,7 @@ jobs:
 
       - name: Publish to npm
         run: |
-          cd libs/{{PACKAGE_NAME}}
+          cd libs/managed-database
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

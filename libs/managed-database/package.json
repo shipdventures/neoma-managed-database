@@ -1,19 +1,19 @@
 {
-  "name": "@neoma/{{PACKAGE_NAME}}",
+  "name": "@neoma/managed-database",
   "version": "0.1.0",
-  "description": "{{PACKAGE_DESCRIPTION}}",
+  "description": "A managed database fixture for Jest testing (unit, integration etc)",
   "author": "Shipdventures",
   "repository": {
     "type": "git",
-    "url": "{{REPO_URL}}"
+    "url": "git@github.com:shipdventures/neoma-managed-database.git"
   },
   "bugs": {
-    "url": "{{REPO_URL}}/issues"
+    "url": "git@github.com:shipdventures/neoma-managed-database.git/issues"
   },
-  "homepage": "{{REPO_URL}}#readme",
+  "homepage": "git@github.com:shipdventures/neoma-managed-database.git#readme",
   "keywords": [
     "nestjs",
-    "{{PACKAGE_NAME}}",
+    "managed-database",
     "laravel",
     "neoma"
   ],
@@ -33,6 +33,9 @@
   "license": "MIT",
   "peerDependencies": {
     "@nestjs/common": "11.x",
-    "@nestjs/core": "11.x"
+    "@nestjs/core": "11.x",
+    "@nestjs/typeorm": "^11.x",
+    "sqlite3": "^5",
+    "typeorm": "^0.3"
   }
 }
